@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Pipeline - {{ pipeline_id }}</title>
+  <style>
+    :root {
+      --color-bg: #222a32;
+      --color-card-bg: #1e1e1e;
+      --color-text-primary: #e5e5e5;
+      --color-text-secondary: #9ca3af;
+      --color-border: #2c2c2c;
+      --color-green: #2ecc71;
+      --color-green-hover: #27ae60;
+      --color-red: #e74c3c;
+      --color-red-hover: #c0392b;
+      --color-indigo: #6366f1;
+      --color-indigo-hover: #4f46e5;
+      --border-radius: 10px;
+      --box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+      --transition: 0.2s ease;
+      --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background-color: var(--color-bg);
+      color: var(--color-text-primary);
+      padding: 20px;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    h1, h2 {
+      color: var(--color-text-primary);
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+
+    .back-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: var(--color-indigo);
+      color: white;
+      padding: 8px 14px;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color var(--transition);
+      box-shadow: var(--box-shadow);
+      z-index: 1000;
+    }
+
+    .back-button:hover {
+      background-color: var(--color-indigo-hover);
+    }
+
+    .card {
+      background: var(--color-card-bg);
+      border-radius: var(--border-radius);
+      padding: 30px 40px; /* increased padding for larger box */
+      box-shadow: var(--box-shadow);
+      margin-top: 80px; /* leave space for fixed back button */
+      border: 1px solid var(--color-border);
+      color: var(--color-text-primary);
+      max-width: 1100px;  /* increased max width */
+      width: 90%;         /* take 90% of viewport width */
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      width: 100%;
+      height: 600px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.4em;
+      padding: 15px;
+      box-sizing: border-box;
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+      background-color: var(--color-card-bg);
+      color: var(--color-text-primary);
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+      resize: vertical;
+    }
+
+    .error {
+      color: #ef4444;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      max-width: 1100px;
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .button {
+      background-color: var(--color-green);
+      color: white;
+      padding: 10px 18px;
+      border: none;
+      border-radius: var(--border-radius);
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: background-color var(--transition);
+      font-weight: 600;
+    }
+
+    .button:hover {
+      background-color: var(--color-green-hover);
+    }
+
+    .cancel-button {
+      background-color: var(--color-red);
+      margin-left: 10px;
+    }
+
+    .cancel-button:hover {
+      background-color: var(--color-red-hover);
+    }
+
+    .form-actions {
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+    }
+
+  </style>
+</head>
+<body>
+
+  <a href="javascript:history.back()" class="back-button">← Back</a>
+
+  <div class="card">
+    <h2>Edit Pipeline YAML - {{ pipeline_id }}</h2>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit">
+      <textarea name="pipeline_yaml" spellcheck="false">{{ pipeline_yaml }}</textarea>
+      <div class="form-actions">
+        <button class="button" type="submit">Save Pipeline</button>
+        <a href="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}">
+          <button type="button" class="button cancel-button">Cancel</button>
+        </a>
+      </div>
+    </form>
+  </div>
+
+</body>
+</html>

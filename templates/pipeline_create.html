@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Pipeline for Project {{ project_id }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            margin: 2rem;
+            color: #2c3e50;
+        }
+
+        h1 {
+            color: #34495e;
+        }
+
+        .error {
+            color: red;
+            margin-bottom: 1rem;
+        }
+
+        form {
+            max-width: 450px;
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        label {
+            display: block;
+            margin-top: 1rem;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            margin-top: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 1.5rem;
+            padding: 10px 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #219150;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 1rem;
+            text-decoration: none;
+            color: #3498db;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Create Pipeline for Project {{ project_id }}</h1>
+
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <form action="/projects/{{ project_id }}/pipelines/create" method="post">
+        <label for="name">Pipeline Name:</label>
+        <input type="text" id="name" name="name" required />
+
+        <label for="identifier">Pipeline Identifier:</label>
+        <input type="text" id="identifier" name="identifier" required />
+
+        <label for="description">Description (optional):</label>
+        <textarea id="description" name="description" rows="4"></textarea>
+
+        <button type="submit">Create Pipeline</button>
+    </form>
+
+    <a href="/projects/{{ project_id }}/pipelines">Back to Pipelines</a>
+</body>
+</html>

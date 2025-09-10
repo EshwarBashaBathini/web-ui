@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Repo Trigger</title>
+</head>
+<body>
+    <h2>Select a GitHub Repo to Trigger Harness Pipeline</h2>
+    <form id="triggerForm">
+        <select name="repo" id="repoSelect">
+            {% for repo in repos %}
+                <option value="{{ repo }}">{{ repo }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Trigger Pipeline</button>
+    </form>
+
+    <p id="statusMsg"></p>
+
+    <script>
+        const form = document.getElementById("triggerForm");
+        const msg = document.getElementById("statusMsg");
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const repo = document.getElementById("repoSelect").value;
+
+            const res = await fetch("/trigger", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `repo=${encodeURIComponent(repo)}`
+            });
+
+            const data = await res.json();
+            if (data.executionId) {
+                msg.innerText = "Triggered. Checking status...";
+
+                let interval = setInterval(async () => {
+                    let statusRes = await fetch(`/status/${data.executionId}`);
+                    let statusData = await statusRes.json();
+                    msg.innerText = `Pipeline Status: ${statusData.status}`;
+                    if (["SUCCEEDED", "FAILED", "ABORTED"].includes(statusData.status)) {
+                        clearInterval(interval);
+                    }
+                }, 3000);
+            } else {
+                msg.innerText = "Failed to trigger pipeline.";
+            }
+        };
+    </script>
+</body>
+</html>

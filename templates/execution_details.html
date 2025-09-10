@@ -1,0 +1,11 @@
+<h2>Execution Details</h2>
+<p>Status: {{ details.status }}</p>
+<p>Start Time: {{ details.startTs }}</p>
+<p>End Time: {{ details.endTs }}</p>
+
+<h3>Stages:</h3>
+<ul>
+  {% for stage in details.stages %}
+    <li>{{ stage.name }} - {{ stage.status }}</li>
+  {% endfor %}
+</ul>

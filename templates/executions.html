@@ -1,0 +1,10 @@
+<h2>Pipeline Executions</h2>
+<ul>
+  {% for execution in executions %}
+    <li>
+      ID: {{ execution.planExecutionId }},
+      Status: {{ execution.status }},
+      <a href="/pipeline-execution/{{ execution.planExecutionId }}">View Details</a>
+    </li>
+  {% endfor %}
+</ul>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Pipeline Execution Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            background: #f9f9f9;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #0052cc;
+        }
+        pre {
+            background: #eee;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+            background: #ffe6e6;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        a.button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 18px;
+            background-color: #0052cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        a.button:hover {
+            background-color: #003d99;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Pipeline Execution Result</h1>
+
+    {% if error %}
+        <div class="error">
+            {{ error }}
+        </div>
+    {% else %}
+        <p><strong>Pipeline ID:</strong> {{ pipeline_id }}</p>
+        <p><strong>Project ID:</strong> {{ project_id }}</p>
+
+        <h2>Response JSON:</h2>
+        <pre>{{ response | tojson(indent=2) }}</pre>
+    {% endif %}
+
+    <a class="button" href="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}">Back to Pipeline Details</a>
+</div>
+</body>
+</html>

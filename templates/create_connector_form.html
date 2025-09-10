@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Create GitHub Connector - {{ project_id }}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f0f4f8, #dfe9f3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: #333;
+    }
+
+    form {
+      background: #fff;
+      padding: 25px 30px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      animation: fadeIn 0.4s ease;
+    }
+
+    .form-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .form-header h1 {
+      color: #2c3e50;
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+
+    .back-btn {
+      background: #ecf0f1;
+      color: #2c3e50;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .back-btn:hover {
+      background: #d0d7de;
+    }
+
+    .back-btn:active {
+      transform: scale(0.97);
+    }
+
+    label {
+      display: block;
+      margin-top: 1.3rem;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #2c3e50;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 0.95rem;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.25);
+    }
+
+    button[type="submit"] {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.25s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    button[type="submit"]:hover {
+      background: #2980b9;
+    }
+
+    button[type="submit"]:active {
+      transform: scale(0.98);
+    }
+
+    button[type="submit"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .error {
+      color: #e74c3c;
+      margin-top: 12px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-align: center;
+      display: none;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 1s linear infinite;
+      box-sizing: border-box;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(15px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <form id="connector-form" autocomplete="off" spellcheck="false">
+    <div class="form-header">
+      <h1>Create GitHub Connector</h1>
+      <button type="button" class="back-btn"
+        onclick="window.location.href='/projects/{{ project_id }}/connectors'">⬅ Back</button>
+    </div>
+
+    <p id="error-msg" class="error"></p>
+
+    <label for="name">Connector Name</label>
+    <input id="name" name="name" placeholder="e.g., my-github-connector" required />
+
+    <label for="url">GitHub Repository URL</label>
+    <input id="url" name="url" type="url" placeholder="https://github.com/my-org/my-repo.git" required />
+
+    <label for="username">GitHub Username</label>
+    <input id="username" name="username" placeholder="e.g., johndoe" pattern="[a-zA-Z0-9\-]+"
+      title="Only letters, numbers, and hyphens allowed." required />
+
+    <label for="secret_ref">Select GitHub PAT (Stored Secret)</label>
+    <select id="secret_ref" name="secret_ref" required>
+      {% if secrets|length > 0 %}
+      {% for secret in secrets %}
+      <option value="account.{{ secret.identifier }}">{{ secret.name }}</option>
+      {% endfor %}
+      {% else %}
+      <option value="">No secrets available</option>
+      {% endif %}
+    </select>
+
+    <label for="description">Description (optional)</label>
+    <input id="description" name="description" placeholder="Add a description..." />
+
+    <button type="submit">
+      <span>Create Connector</span>
+    </button>
+  </form>
+
+  <script>
+    const projectId = "{{ project_id }}";
+
+    document.getElementById("connector-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const spinner = document.createElement('span');
+      spinner.classList.add('spinner');
+
+      // Disable button and show spinner
+      submitBtn.disabled = true;
+      submitBtn.appendChild(spinner);
+
+      const payload = {
+        name: document.getElementById("name").value,
+        url: document.getElementById("url").value,
+        username: document.getElementById("username").value,
+        password_ref: document.getElementById("secret_ref").value,
+        description: document.getElementById("description").value
+      };
+
+      const errorMsg = document.getElementById("error-msg");
+      errorMsg.style.display = "none";
+      errorMsg.textContent = "";
+
+      try {
+        const response = await fetch(`/projects/${projectId}/connectors/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        // Remove spinner and enable button after response
+        submitBtn.removeChild(spinner);
+        submitBtn.disabled = false;
+
+        if (response.ok) {
+          alert("Connector created successfully!");
+          window.location.href = `/projects/${projectId}/connectors`;
+        } else {
+          errorMsg.textContent = "⚠️ Error: " + (result.detail || "Unknown error");
+          errorMsg.style.display = "block";
+        }
+      } catch (err) {
+        // Remove spinner and enable button if error
+        submitBtn.removeChild(spinner);
+        submitBtn.disabled = false;
+
+        errorMsg.textContent = "⚠️ Request failed: " + err.message;
+        errorMsg.style.display = "block";
+      }
+    });
+  </script>
+
+</body>
+
+</html>

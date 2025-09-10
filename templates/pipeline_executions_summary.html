@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Pipeline Executions Summary</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Executions Summary for Pipeline: {{ pipeline_id }}</h1>
+
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if executions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Execution ID</th>
+                    <th>Status</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Triggered By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for execution in executions %}
+                <tr>
+                    <td>{{ execution.planExecutionId or execution.uuid or execution.id or "N/A" }}</td>
+                    <td>{{ execution.status or "N/A" }}</td>
+                    <td>{{ execution.startTs | default("N/A") }}</td>
+                    <td>{{ execution.endTs | default("N/A") }}</td>
+                    <td>
+                        {% if execution.triggeredBy %}
+                            {{ execution.triggeredBy.name or execution.triggeredBy.identifier or "N/A" }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No executions found.</p>
+    {% endif %}
+
+</body>
+</html>

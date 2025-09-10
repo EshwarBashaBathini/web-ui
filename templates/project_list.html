@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harness Projects</title>
+  <style>
+    :root {
+      --color-bg: #f9fafb;
+      --color-card-bg: #ffffff;
+      --color-text-primary: #1e293b;
+      --color-text-secondary: #475569;
+      --color-border: #e2e8f0;
+      --color-green: #2ecc71;
+      --color-red: #ef4444;
+      --color-blue: #3498db;
+      --border-radius: 10px;
+      --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+      --transition: 0.25s ease;
+      --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-family);
+      background-color: var(--color-bg);
+      color: var(--color-text-primary);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body {
+      flex-grow: 1;
+      width: 100vw;
+    }
+
+    header {
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 100%;
+      max-width: 100vw;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+
+    .create-button {
+      background-color: var(--color-blue);
+      color: white;
+      padding: 8px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color var(--transition);
+      text-decoration: none;
+    }
+
+    .create-button:hover {
+      background-color: #2c80b4;
+    }
+
+    .error {
+      color: var(--color-red);
+      margin-bottom: 1rem;
+      font-weight: 600;
+      width: 100vw;
+      padding: 0 40px;
+      box-sizing: border-box;
+    }
+
+    ul.project-list {
+      list-style: none;
+      margin: 0;
+      padding: 0 40px 30px 40px;
+      width: 100vw;
+      box-sizing: border-box;
+    }
+
+    li.project-item {
+      background-color: var(--color-card-bg);
+      box-shadow: var(--box-shadow);
+      border-radius: var(--border-radius);
+      padding: 18px 24px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      max-width: 100%;
+    }
+
+    .project-info {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      flex-grow: 1;
+      word-break: break-word;
+      min-width: 200px;
+    }
+
+    .project-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    a.pipeline-link,
+    button.update-button,
+    button.show-update-button {
+      background-color: var(--color-green);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background-color var(--transition);
+      text-decoration: none;
+    }
+
+    button.delete-button {
+      background-color: var(--color-red);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background-color var(--transition);
+    }
+
+    a.pipeline-link:hover,
+    button.update-button:hover,
+    button.show-update-button:hover {
+      background-color: #27ae60;
+    }
+
+    button.delete-button:hover {
+      background-color: #c0392b;
+    }
+
+    a.pipeline-link {
+      background-color: var(--color-blue);
+    }
+
+    a.pipeline-link:hover {
+      background-color: #2c80b4;
+    }
+
+    form.update-form {
+      flex: 1 1 100%;
+      margin-top: 12px;
+      display: none;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      max-width: 100vw;
+      padding: 0 40px;
+      box-sizing: border-box;
+    }
+
+    form.update-form input[type="text"] {
+      flex-grow: 1;
+      max-width: 220px;
+      padding: 8px 12px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-primary);
+      transition: border-color var(--transition);
+    }
+
+    form.update-form input[type="text"]:focus {
+      outline: none;
+      border-color: var(--color-green);
+      box-shadow: 0 0 6px rgba(46, 204, 113, 0.4);
+    }
+
+    .no-projects {
+      font-size: 1.1rem;
+      color: var(--color-text-secondary);
+      width: 100vw;
+      padding: 0 40px;
+      box-sizing: border-box;
+    }
+
+    /* Delete Modal */
+    #deleteModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #deleteModalContent {
+      background: #fff;
+      padding: 24px;
+      border-radius: 8px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    #deleteModalContent h2 {
+      margin-top: 0;
+    }
+
+    #deleteConfirmInput {
+      width: 100%;
+      margin-top: 6px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    #deleteModalActions {
+      margin-top: 18px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    #deleteModalActions button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    #deleteCancelBtn {
+      background: var(--color-red);
+      color: #fff;
+    }
+
+    #deleteCancelBtn:hover {
+      background: #c0392b;
+    }
+
+    #confirmDeleteBtn {
+      background: var(--color-green);
+      color: #fff;
+    }
+
+    #confirmDeleteBtn:hover {
+      background: #27ae60;
+    }
+
+    @media (max-width: 720px) {
+      header {
+        padding: 20px;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      h1 {
+        font-size: 1.6rem;
+        flex-basis: 100%;
+        margin-bottom: 10px;
+      }
+
+      ul.project-list {
+        padding: 0 20px 20px 20px;
+      }
+
+      li.project-item {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      form.update-form {
+        gap: 8px;
+        padding: 0 20px;
+      }
+
+      form.update-form input[type="text"] {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Harness Projects</h1>
+    <a href="/create" class="create-button" aria-label="Create new project">+ Create Project</a>
+  </header>
+
+  {% if error %}
+  <p class="error">Error: {{ error }}</p>
+  {% endif %}
+
+  {% if projects %}
+  <ul class="project-list" aria-live="polite" aria-label="List of harness projects">
+    {% for project in projects %}
+    <li class="project-item" role="listitem">
+      <span class="project-info">{{ project.name }} ({{ project.identifier }})</span>
+      <div class="project-actions">
+        <a href="/projects/{{ project.identifier }}/pipelines" class="pipeline-link"
+          aria-label="View pipelines for {{ project.name }}">View Pipelines</a>
+        <button type="button" class="show-update-button" aria-expanded="false"
+          aria-controls="update-form-{{ project.identifier }}"
+          onclick="toggleUpdateForm('{{ project.identifier }}', this)">Edit</button>
+        <button type="button" class="delete-button"
+          onclick="openDeleteModal('{{ project.identifier }}', '{{ project.name }}')">Delete</button>
+      </div>
+
+      <form method="post" action="/projects/update" class="update-form" id="update-form-{{ project.identifier }}"
+        aria-hidden="true">
+        <input type="hidden" name="identifier" value="{{ project.identifier }}" />
+        <input type="text" name="name" value="{{ project.name }}" placeholder="Name" required />
+        <input type="text" name="color" value="{{ project.color or '#0063F7' }}" placeholder="Color hex (#123ABC)" />
+        <input type="text" name="description" value="{{ project.description or '' }}" placeholder="Description" />
+        <button type="submit" class="update-button">Save</button>
+        <button type="button" class="delete-button"
+          onclick="toggleUpdateForm('{{ project.identifier }}', this)">Cancel</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="no-projects">No projects found.</p>
+  {% endif %}
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal">
+    <div id="deleteModalContent">
+      <h2>Delete Project</h2>
+      <p id="deleteMessage"></p>
+      <label for="deleteConfirmInput"><strong>To confirm, type the project's name:</strong></label>
+      <input type="text" id="deleteConfirmInput" />
+      <div id="deleteModalActions">
+        <button id="deleteCancelBtn" onclick="closeDeleteModal()">Cancel</button>
+        <button id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleUpdateForm(id, btn) {
+      const form = document.getElementById('update-form-' + id);
+      if (form.style.display === 'flex') {
+        form.style.display = 'none';
+        btn.setAttribute('aria-expanded', 'false');
+        form.setAttribute('aria-hidden', 'true');
+      } else {
+        form.style.display = 'flex';
+        btn.setAttribute('aria-expanded', 'true');
+        form.setAttribute('aria-hidden', 'false');
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    let currentProjectId = null;
+    let currentProjectName = null;
+
+    function openDeleteModal(projectId, projectName) {
+      currentProjectId = projectId;
+      currentProjectName = projectName;
+
+      document.getElementById("deleteMessage").innerHTML = `
+        Deleting the project '<b>${projectName}</b>' will also permanently delete all the modules data & resources like pipelines, templates, connectors, secrets etc. within this Project.<br><br>
+        However, resources in the <b>Feature Management & Experimentation (FME)</b> module will not be affected by this deletion. To remove FME resources, you must delete them individually before deleting this project.<br><br>
+        Are you sure you want to proceed with this project's deletion?
+      `;
+
+      document.getElementById("deleteModal").style.display = "flex";
+      document.getElementById("deleteConfirmInput").value = "";
+    }
+
+    function closeDeleteModal() {
+      document.getElementById("deleteModal").style.display = "none";
+    }
+
+    document.getElementById("confirmDeleteBtn").addEventListener("click", function () {
+      const inputVal = document.getElementById("deleteConfirmInput").value.trim();
+      if (inputVal === currentProjectName) {
+        const form = document.createElement("form");
+        form.method = "post";
+        form.action = "/projects/delete";
+
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "identifier";
+        hidden.value = currentProjectId;
+
+        form.appendChild(hidden);
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        alert("The project name does not match. Please type it correctly to confirm.");
+      }
+    });
+  </script>
+</body>
+
+</html>
