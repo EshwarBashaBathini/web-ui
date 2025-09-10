@@ -41,8 +41,8 @@
   "custom": {
     "success": 0,
     "failed": 1,
-    "aborted": 0,
-    "last_run": "2025-09-10 13:02:21 IST",
+    "aborted": 1,
+    "last_run": "2025-09-10 15:13:18 IST",
     "last_status": "Failed",
     "executions": [
       {
