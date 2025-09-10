@@ -1367,4 +1367,4 @@ EOF
 # Run the app
 if __name__ == "__main__":
     # Use debug=True for development; set False for production
-    app.run(host="127.0.0.1", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)
