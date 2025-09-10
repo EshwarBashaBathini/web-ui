@@ -1,6 +1,6 @@
 # app_flask.py
 # Converted from FastAPI -> Flask (original: main.py). See original for reference. :contentReference[oaicite:1]{index=1}
-
+from zoneinfo import ZoneInfo
 import os
 import re
 import json
@@ -74,6 +74,7 @@ def save_pipeline_stats(data):
     with open(JSON_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
+# --- Stats Logic (unchanged) ---
 def update_pipeline_stats(pipeline_name, status, end_ts=None, execution_id=None):
     data = load_pipeline_stats()
 
@@ -83,22 +84,21 @@ def update_pipeline_stats(pipeline_name, status, end_ts=None, execution_id=None)
             "failed": 0,
             "aborted": 0,
             "last_run": "-",
+            "last_status": "-",
             "executions": []
         }
 
-    # Check if execution exists
-    exec_found = None
+    # Check if execution already exists
+    existing_exec = None
     if execution_id:
         for exec_entry in data[pipeline_name]["executions"]:
-            if exec_entry.get("id") == execution_id:
-                exec_found = exec_entry
+            if exec_entry["id"] == execution_id:
+                existing_exec = exec_entry
                 break
 
-    if exec_found:
-        # update if status changed and is final
-        if exec_found.get("status") != status and status in ["Succeeded", "Success", "Failed", "Errored", "Aborted"]:
-            exec_found["status"] = status
-            exec_found["end_ts"] = end_ts
+    if existing_exec:
+        existing_exec["status"] = status
+        existing_exec["end_ts"] = end_ts
     else:
         data[pipeline_name]["executions"].append({
             "id": execution_id,
@@ -106,16 +106,45 @@ def update_pipeline_stats(pipeline_name, status, end_ts=None, execution_id=None)
             "end_ts": end_ts
         })
 
-    recalc_pipeline_stats()
+    # Recalculate counts + last run + last status
+    success = failed = aborted = 0
+    last_run = None
+    last_status = "-"
+
+    for exec_entry in data[pipeline_name]["executions"]:
+        st = exec_entry.get("status")
+        ts = exec_entry.get("end_ts")
+
+        if st in ["Succeeded", "Success"]:
+            success += 1
+        elif st in ["Failed", "Errored"]:
+            failed += 1
+        elif st == "Aborted":
+            aborted += 1
+
+        if ts and (not last_run or ts > last_run):
+            last_run = ts
+            last_status = st
+
+    data[pipeline_name]["success"] = success
+    data[pipeline_name]["failed"] = failed
+    data[pipeline_name]["aborted"] = aborted
+    data[pipeline_name]["last_run"] = (
+        datetime.fromtimestamp(last_run / 1000, tz=ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S IST")
+        if last_run else "-"
+    )
+    data[pipeline_name]["last_status"] = last_status
+
     save_pipeline_stats(data)
+    recalc_pipeline_stats()
+
 
 def recalc_pipeline_stats():
     data = load_pipeline_stats()
     for pipeline_name, info in data.items():
-        info["success"] = 0
-        info["failed"] = 0
-        info["aborted"] = 0
+        info["success"] = info["failed"] = info["aborted"] = 0
         last_run = None
+        last_status = "-"
 
         for exec_entry in info.get("executions", []):
             status = exec_entry.get("status")
@@ -130,23 +159,17 @@ def recalc_pipeline_stats():
 
             if end_ts and (not last_run or end_ts > last_run):
                 last_run = end_ts
+                last_status = status
 
-        # convert last_run to IST formatted string if present
-        if last_run:
-            try:
-                import pytz
-                ist = pytz.timezone("Asia/Kolkata")
-                info["last_run"] = (
-                    datetime.fromtimestamp(last_run / 1000, tz=pytz.utc)
-                    .astimezone(ist)
-                    .strftime("%Y-%m-%d %H:%M:%S IST")
-                )
-            except Exception:
-                info["last_run"] = str(last_run)
-        else:
-            info["last_run"] = info.get("last_run", "-")
+        info["last_run"] = (
+            datetime.fromtimestamp(last_run / 1000, tz=ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S IST")
+            if last_run else "-"
+        )
+        info["last_status"] = last_status
 
     save_pipeline_stats(data)
+
+
 
 # ---------------- Routes ---------------- #
 
@@ -174,18 +197,29 @@ def list_projects():
 def list_pipelines(project_id):
     pipelines_url = f"https://app.harness.io/v1/orgs/{ORG_ID}/projects/{project_id}/pipelines"
     headers = get_harness_headers()
+
     try:
-        r = requests.get(pipelines_url, headers=headers, params={"page": 0, "limit": 50}, timeout=10)
-        r.raise_for_status()
-        content = r.json()
+        response = requests.get(pipelines_url, headers=headers, params={"page": 0, "limit": 20})
+        response.raise_for_status()
+        content = response.json()
         pipelines_data = content if isinstance(content, list) else content.get("data", {}).get("content", [])
+
+        # ✅ Recalculate stats
         recalc_pipeline_stats()
         stats = load_pipeline_stats()
+
+        # ✅ Keep only pipelines that exist in Harness
+        harness_pipeline_names = {p.get("name") for p in pipelines_data}
+        stats = {name: info for name, info in stats.items() if name in harness_pipeline_names}
+        save_pipeline_stats(stats)
+
         pipelines = []
         for p in pipelines_data:
             pipeline_name = p.get("name")
             pipeline_id = p.get("identifier")
-            stat = stats.get(pipeline_name, {"success": 0, "failed": 0, "aborted": 0, "last_run": "-"})
+
+            stat = stats.get(pipeline_name, {"success": 0, "failed": 0, "aborted": 0, "last_run": "-", "last_status": "-"})
+
             pipelines.append({
                 "name": pipeline_name,
                 "identifier": pipeline_id,
@@ -193,12 +227,19 @@ def list_pipelines(project_id):
                 "failed_count": stat["failed"],
                 "aborted_count": stat["aborted"],
                 "last_run": stat["last_run"],
+                "last_status": stat.get("last_status", "-")
             })
-        return render_template("pipeline_list.html", project_id=project_id, pipelines=pipelines)
-    except requests.RequestException as e:
-        logger.error(f"Error fetching pipelines: {e}")
-        return render_template("pipeline_list.html", project_id=project_id, pipelines=[], error=str(e))
 
+        return render_template("pipeline_list.html",
+                               project_id=project_id,
+                               pipelines=pipelines)
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching pipelines: {e}")
+        return render_template("pipeline_list.html",
+                               project_id=project_id,
+                               pipelines=[],
+                               error=str(e))
 # Delete project
 @app.route("/projects/delete", methods=["POST"])
 def delete_project():
