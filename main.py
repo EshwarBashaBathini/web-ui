@@ -240,6 +240,72 @@ def list_pipelines(project_id):
                                project_id=project_id,
                                pipelines=[],
                                error=str(e))
+
+
+                            
+
+#new method testing
+from datetime import datetime
+
+# Register custom Jinja filter
+def format_ts(value):
+    """Convert epoch (ms/sec) → human readable timestamp"""
+    if not value:
+        return "-"
+    try:
+        ts = int(value)
+        # Convert ms → sec if needed
+        if ts > 1e12:
+            ts = ts / 1000
+        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(value)
+
+app.jinja_env.filters['format_ts'] = format_ts
+
+from flask import render_template
+BASE_URL = "https://app.harness.io/gateway/pipeline/api"
+
+
+# ✅ Common headers to use in all API requests
+HEADERS = {
+    "x-api-key": HARNESS_API_KEY,
+    "Content-Type": "application/json"
+}
+
+@app.route("/projects/<project_id>/executions")
+def project_executions(project_id):
+    url = f"{BASE_URL}/pipelines/execution/summary"
+    params = {
+        "accountIdentifier": HARNESS_ACCOUNT_ID,
+        "orgIdentifier": ORG_ID,
+        "projectIdentifier": project_id,
+        "page": 0,
+        "size": 20,
+        "sort": "startTs,DESC"
+    }
+    payload = {"filterType": "PipelineExecution", "moduleProperties": {"ci": {}, "cd": {}}}
+    response = requests.post(url, headers=HEADERS, params=params, json=payload)
+    data = response.json()
+
+    executions = []
+    if "data" in data and "content" in data["data"]:
+        for exec_item in data["data"]["content"]:
+            executions.append({
+                "id": exec_item.get("planExecutionId"),
+                "pipeline": exec_item.get("pipelineName") or exec_item.get("pipelineIdentifier"),
+                "pipeline_id": exec_item.get("pipelineIdentifier"),
+                "status": exec_item.get("status"),
+                "startTs": format_ts(exec_item.get("startTs")),
+                "endTs": format_ts(exec_item.get("endTs"))
+            })
+
+    return render_template("executions.html",
+                           project_id=project_id,
+                           executions=executions,
+                           error=data.get("message"))
+
+
 # Delete project
 @app.route("/projects/delete", methods=["POST"])
 def delete_project():
@@ -420,83 +486,141 @@ def run_pipeline_post(project_id, pipeline_id):
         return render_template("pipeline_run.html", project_id=project_id, pipeline_id=pipeline_id, runtime_input_yaml=runtime_input_yaml, error=str(e), success=None)
     return redirect(url_for('pipeline_run_view', project_id=project_id, pipeline_id=pipeline_id, execution_id=execution_id))
 
+
 @app.route("/projects/<project_id>/pipelines/<pipeline_id>/run", methods=["GET"])
 def pipeline_run_view(project_id, pipeline_id):
     execution_id = request.args.get("execution_id")
     if not execution_id:
-        return render_template("pipeline_run.html", execution_id=None, plan_execution_id=None, project_id=project_id, pipeline_name=None, status=None, stages=[], total_stages=0)
-    headers = get_harness_headers()
+        return render_template(
+            "pipeline_run.html",
+            execution_id=None,
+            plan_execution_id=None,
+            node_execution_id=None,
+            project_id=project_id,
+            pipeline_name=None,
+            status=None,
+            stages=[],
+            total_stages=0,
+        )
+
+    headers = HEADERS  # ✅ reuse your global HEADERS
     try:
+        # ✅ Fetch execution details
         detail_url = (
-            f"https://app.harness.io/pipeline/api/pipelines/execution/v2/{execution_id}"
+            f"{BASE_URL}/pipelines/execution/v2/{execution_id}"
             f"?accountIdentifier={HARNESS_ACCOUNT_ID}&orgIdentifier={ORG_ID}"
             f"&projectIdentifier={project_id}&renderFullBottomGraph=true"
         )
         detail_resp = requests.get(detail_url, headers=headers, timeout=10)
         detail_resp.raise_for_status()
         exec_data = detail_resp.json().get("data", {})
+
         pipeline_summary = exec_data.get("pipelineExecutionSummary", {})
         execution_status = pipeline_summary.get("status", "Unknown")
         pipeline_name = pipeline_summary.get("name", "Unknown Pipeline")
         end_ts = pipeline_summary.get("endTs")
         plan_execution_id = pipeline_summary.get("planExecutionId")
 
-        update_pipeline_stats(pipeline_name, execution_status, end_ts, execution_id=execution_id)
+        # ✅ Optional: update stats
+        try:
+            update_pipeline_stats(
+                pipeline_name,
+                execution_status,
+                end_ts,
+                execution_id=execution_id,
+            )
+        except Exception as e:
+            logger.warning("update_pipeline_stats failed: %s", e)
 
-        layout_nodes = pipeline_summary.get("layoutNodeMap", {})
+        # ✅ Extract nodeExecutionId (first node)
         node_execution_id = None
-        for node_info in layout_nodes.values():
+        for node_info in pipeline_summary.get("layoutNodeMap", {}).values():
             node_exec_id = node_info.get("nodeExecutionId")
             if node_exec_id:
                 node_execution_id = node_exec_id
                 break
 
+        # ✅ Build node map (stages & steps)
         node_map = exec_data.get("layoutNodeMap", {}) or exec_data.get("executionGraph", {}).get("nodeMap", {})
 
-        # fetch pipeline yaml
+        # ✅ Fetch pipeline YAML definition
         yaml_url = (
-            f"https://app.harness.io/pipeline/api/pipelines/{pipeline_id}"
+            f"{BASE_URL}/pipelines/{pipeline_id}"
             f"?accountIdentifier={HARNESS_ACCOUNT_ID}&orgIdentifier={ORG_ID}&projectIdentifier={project_id}"
             f"&template_applied=false"
         )
         yaml_resp = requests.get(yaml_url, headers=headers, timeout=10)
         yaml_resp.raise_for_status()
-        pipeline_yaml = yaml_resp.json().get("data", {}).get("yamlPipeline") or yaml_resp.json().get("data", {}).get("yaml")
+        pipeline_yaml = yaml_resp.json().get("data", {}).get("yamlPipeline") \
+            or yaml_resp.json().get("data", {}).get("yaml")
 
         stages = []
         if pipeline_yaml:
             try:
                 parsed_yaml = yaml.safe_load(pipeline_yaml)
-                stages_list = parsed_yaml.get('pipeline', {}).get('stages', [])
+                stages_list = parsed_yaml.get("pipeline", {}).get("stages", [])
                 for stage_entry in stages_list:
-                    stage = stage_entry.get('stage', {})
-                    stage_name = stage.get('name', "Unnamed Stage")
-                    stage_identifier = stage.get('identifier')
+                    stage = stage_entry.get("stage", {})
+                    stage_name = stage.get("name", "Unnamed Stage")
+                    stage_identifier = stage.get("identifier")
                     stage_status = "Unknown"
+
+                    # Match stage with execution status
                     for node in node_map.values():
                         if node.get("identifier") == stage_identifier:
                             stage_status = node.get("status", "Unknown")
                             break
+
+                    # Collect step info
                     step_list = []
-                    steps_list = stage.get('spec', {}).get('execution', {}).get('steps', [])
-                    for step_entry in steps_list:
-                        step = step_entry.get('step', {})
-                        step_name = step.get('name', "Unnamed Step")
-                        step_identifier = step.get('identifier')
-                        step_status = "Unknown"
+                    for step_entry in stage.get("spec", {}).get("execution", {}).get("steps", []):
+                        step = step_entry.get("step", {})
+                        step_name = step.get("name", "Unnamed Step")
+                        step_identifier = step.get("identifier")
+                        step_status = "Pending"
                         for node in node_map.values():
                             if node.get("identifier") == step_identifier:
-                                step_status = node.get("status", "Unknown")
+                                step_status = node.get("status", "pending")
                                 break
                         step_list.append({"name": step_name, "status": step_status})
-                    stages.append({"name": stage_name, "status": stage_status, "steps": step_list})
-            except yaml.YAMLError:
+
+                    stages.append({
+                        "name": stage_name,
+                        "status": stage_status,
+                        "steps": step_list
+                    })
+            except yaml.YAMLError as e:
+                logger.error("YAML parse error: %s", e)
                 stages = []
+
         total_stages = len(stages)
+
     except requests.RequestException as e:
         logger.error("Error fetching execution: %s", e)
-        return render_template("pipeline_run.html", execution_id=execution_id, plan_execution_id=None, project_id=project_id, pipeline_name=None, status="Unknown", stages=[], total_stages=0)
-    return render_template("pipeline_run.html", execution_id=execution_id, plan_execution_id=plan_execution_id, node_execution_id=node_execution_id, project_id=project_id, pipeline_name=pipeline_name, status=execution_status, stages=stages, total_stages=total_stages)
+        return render_template(
+            "pipeline_run.html",
+            execution_id=execution_id,
+            plan_execution_id=None,
+            node_execution_id=None,
+            project_id=project_id,
+            pipeline_name=None,
+            status="Unknown",
+            stages=[],
+            total_stages=0,
+        )
+
+    return render_template(
+        "pipeline_run.html",
+        execution_id=execution_id,
+        plan_execution_id=plan_execution_id,
+        node_execution_id=node_execution_id,
+        project_id=project_id,
+        pipeline_name=pipeline_name,
+        status=execution_status,
+        stages=stages,
+        total_stages=total_stages,
+    )
+
 
 # Abort pipeline
 @app.route("/abort-pipeline", methods=["POST"])
@@ -1404,6 +1528,11 @@ EOF
         error_text = getattr(e.response, 'text', '') if getattr(e, 'response', None) else ""
         logger.error("Pipeline creation failed: %s", error_text)
         return jsonify({"error": f"Failed to create pipeline: {str(e)}", "response": error_text}), 400
+
+
+
+
+
 
 # Run the app
 if __name__ == "__main__":

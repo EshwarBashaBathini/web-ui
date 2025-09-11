@@ -25,6 +25,7 @@
     * {
       box-sizing: border-box;
     }
+
     .status-success {
       background-color: var(--color-success);
     }
@@ -545,6 +546,23 @@
         right: -30px;
       }
     }
+    /* Highlight container if status is AsyncWaiting */
+.container.async-waiting {
+  background: #fff8e1; /* soft yellow */
+  border: 2px dashed #f59e0b; /* amber border */
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.status-asyncwaiting {
+  background-color: #f59e0b; /* amber/orange */
+  color: white;
+}
+
   </style>
 </head>
 
@@ -555,14 +573,15 @@
         <h1>Pipeline: {{ pipeline_name }}</h1>
       </div>
       <div class="menu-back-container">
-        <button class="back-to-pipelines-btn" onclick="window.location.href='/projects/{{ project_id }}/pipelines'">
+        <button class="back-to-pipelines-btn" onclick="window.history.back()">
           ⬅ Back
         </button>
+
         <button id="menuBtn" class="menu-button" aria-label="More options" tabindex="0">&#8942;</button>
         <div id="dropdownMenu" class="dropdown-menu">
           <button id="editBtn" class="dropdown-item edit-btn">✏️ Edit</button>
           <button id="rerunBtn" class="dropdown-item rerun-btn">🔄 Rerun</button>
-          <button id="abortBtn" class="dropdown-item abort-btn" {% if status.strip().lower() in ["aborted", "failed"]
+          <button id="abortBtn" class="dropdown-item abort-btn" {% if status.strip().lower() in ["aborted", "failed" ]
             %}disabled{% endif %}>
             ⛔ Abort Pipeline
           </button>
@@ -576,7 +595,7 @@
       <p><strong>Execution ID:</strong> {{ execution_id }}</p>
 
       {% set exec_class = "status-unknown" %}
-      {% if status.strip().lower() == "succeeded" %}
+      {% if status.strip().lower() == "success" %}
       {% set exec_class = "status-success" %}
       {% elif status.strip().lower() == "failed" %}
       {% set exec_class = "status-failed" %}
@@ -627,7 +646,7 @@
       {% if stages %}
       {% for stage in stages %}
       {% set stage_class = "status-unknown" %}
-      {% if stage.status.strip().lower() == "succeeded" %}
+      {% if stage.status.strip().lower() == "success" %}
       {% set stage_class = "status-success" %}
       {% elif stage.status.strip().lower() == "failed" %}
       {% set stage_class = "status-failed" %}
@@ -644,7 +663,7 @@
         <div class="steps">
           {% for step in stage.steps %}
           {% set step_class = "status-unknown" %}
-          {% if step.status.strip().lower() == "succeeded" %}
+          {% if step.status.strip().lower() == "success" %}
           {% set step_class = "status-success" %}
           {% elif step.status.strip().lower() == "failed" %}
           {% set step_class = "status-failed" %}
@@ -652,6 +671,7 @@
           {% set step_class = "status-aborted" %}
           {% elif step.status.strip().lower() == "running" %}
           {% set step_class = "status-running" %}
+          
           {% endif %}
           <div class="step">
             <span>{{ step.name }}</span>

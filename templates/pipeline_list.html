@@ -131,10 +131,12 @@
   </div>
 
   <div class="nav-links">
-    <a href="/create">+ Create Pipeline</a>
-    <a href="/projects/{{ project_id }}/connectors">Connectors Settings</a>
-    <a href="/projects/{{ project_id }}/secrets">Secret Settings</a>
-  </div>
+  <a href="/create">+ Create Pipeline</a>
+  <a href="/projects/{{ project_id }}/executions">Executions List</a>
+  <a href="/projects/{{ project_id }}/connectors">Connectors Settings</a>
+  <a href="/projects/{{ project_id }}/secrets">Secret Settings</a>
+</div>
+
 
   {% if error %}
   <p class="error">Error: {{ error }}</p>

@@ -1,10 +1,507 @@
-<h2>Pipeline Executions</h2>
-<ul>
-  {% for execution in executions %}
-    <li>
-      ID: {{ execution.planExecutionId }},
-      Status: {{ execution.status }},
-      <a href="/pipeline-execution/{{ execution.planExecutionId }}">View Details</a>
-    </li>
-  {% endfor %}
-</ul>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Executions for Project {{ project_id }}</title>
+    <style>
+        :root {
+            --color-bg: #f9fafb;
+            --color-card: #ffffff;
+            --color-primary: #3498db;
+            --color-danger: #dc2626;
+            --color-success: #16a34a;
+            --color-warning: #f97316;
+            --color-aborted: #6b7280;
+            --color-unknown: #94a3b8;
+            --color-expired: #9333ea;
+            --radius: 8px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            padding: 20px;
+            background: var(--color-bg);
+            color: #1e293b;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .back {
+            margin-bottom: 20px;
+            display: inline-block;
+            text-decoration: none;
+            padding: 10px 16px;
+            background: var(--color-primary);
+            color: white;
+            border-radius: var(--radius);
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .back:hover {
+            background: #2c80b4;
+            transform: translateY(-2px);
+        }
+
+        .table-container {
+            background: var(--color-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 850px;
+        }
+
+        th,
+        td {
+            padding: 14px 18px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        th {
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f9fafc;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-align: center;
+            min-width: 90px;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: var(--color-success);
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: var(--color-danger);
+        }
+
+        .status-running {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .status-aborted {
+            background: #e5e7eb;
+            color: var(--color-aborted);
+        }
+
+        .status-expired {
+            background: #f3e8ff;
+            color: var(--color-expired);
+        }
+
+        .status-unknown {
+            background: #f1f5f9;
+            color: var(--color-unknown);
+        }
+
+        /* Pipeline link */
+        .pipeline-link {
+            font-weight: 600;
+            color: var(--color-primary);
+            text-decoration: none;
+        }
+
+        .pipeline-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Dropdown menu */
+        .menu-container {
+            position: relative;
+        }
+
+        .menu-button {
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .menu-button:hover {
+            background: #f1f5f9;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 28px;
+            right: 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            box-shadow: var(--shadow);
+            border-radius: var(--radius);
+            z-index: 10;
+            min-width: 180px;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            text-align: left;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .dropdown-item:hover:enabled {
+            background: #f9fafb;
+            transform: translateX(2px);
+        }
+
+        .dropdown-item:disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .edit-btn {
+            color: #1e40af;
+        }
+
+        .rerun-btn {
+            color: #16a34a;
+        }
+
+        .view-btn {
+            color: #2563eb;
+        }
+
+        .abort-btn {
+            color: var(--color-danger);
+            font-weight: 600;
+        }
+
+        /* Modal */
+        #abortModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+        }
+
+        #abortModal .modal-content {
+            background: #fff;
+            padding: 25px;
+            max-width: 500px;
+            margin: 10% auto;
+            border-radius: var(--radius);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        #abortModal h4 {
+            margin-top: 0;
+            color: var(--color-danger);
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        #abortModal p {
+            font-size: 0.9rem;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        #abortModal textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        #abortModal .actions {
+            text-align: right;
+        }
+
+        #abortModal button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        #cancelAbort {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-align: center;
+            min-width: 90px;
+        }
+
+        /* ✅ Success = Green */
+        .status-success {
+            background: #dcfce7;
+            color: var(--color-success);
+        }
+
+        /* ✅ Failed = Red */
+        .status-failed {
+            background: #fee2e2;
+            color: var(--color-danger);
+        }
+
+        /* ✅ Running = Yellow */
+        .status-running {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        /* ✅ Aborted = Strong Red */
+        .status-aborted {
+            background: #fee2e2;
+            /* light red background */
+            color: #dc2626;
+            /* strong red text */
+            border: 1px solid #dc2626;
+        }
+
+        /* ✅ Expired = Purple */
+        .status-expired {
+            background: #f3e8ff;
+            color: var(--color-expired);
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back {
+            text-decoration: none;
+            padding: 10px 16px;
+            background: var(--color-primary);
+            color: white;
+            border-radius: var(--radius);
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .back:hover {
+            background: #2c80b4;
+            transform: translateY(-2px);
+        }
+
+
+        /* ✅ Unknown = Gray */
+        .status-unknown {
+            background: #f1f5f9;
+            color: var(--color-unknown);
+        }
+
+
+        #cancelAbort:hover {
+            background: #d1d5db;
+        }
+
+        #confirmAbort {
+            background: var(--color-danger);
+            color: white;
+        }
+
+        #confirmAbort:hover {
+            background: #b91c1c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header-bar">
+        <h1>Executions for Project {{ project_id }}</h1>
+        <div class="header-actions">
+            <a href="/projects/{{ project_id }}/pipelines" class="back">← Back</a>
+        </div>
+    </div>
+
+    {% if executions %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pipeline</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Ended</th>
+                    <th>Execution ID</th>
+                    <th>Options</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exec in executions %}
+                <tr>
+                    <td>
+                        <a class="pipeline-link"
+                            href="/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/run?execution_id={{ exec.id }}">
+                            {{ exec.pipeline }}
+                        </a>
+                    </td>
+                    <td><span class="status-badge status-{{ exec.status|lower }}">{{ exec.status }}</span></td>
+                    <td>{{ exec.startTs|format_ts }}</td>
+                    <td>{{ exec.endTs|format_ts }}</td>
+                    <td>{{ exec.id }}</td>
+                    <td>
+                        <div class="menu-container">
+                            <button class="menu-button">&#8942;</button>
+                            <div class="dropdown-menu">
+                                <button class="dropdown-item view-btn"
+                                    onclick="window.location.href='/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/run?execution_id={{ exec.id }}'">
+                                    👁 View Execution
+                                </button>
+                                <button class="dropdown-item edit-btn"
+                                    onclick="window.location.href='/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/edit'">
+                                    ✏️ Edit
+                                </button>
+                                <button class="dropdown-item rerun-btn" {% if exec.status|lower=="running" %}disabled{%
+                                    endif %}
+                                    onclick="window.location.href='/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/run?execution_id={{ exec.id }}'">
+                                    🔄 Rerun
+                                </button>
+                                <button class="dropdown-item abort-btn" {% if exec.status|lower in
+                                    ["aborted","failed","expired"] %}disabled{% endif %}
+                                    onclick="openAbortModal('{{ exec.id }}','{{ project_id }}','{{ exec.pipeline_id }}')">
+                                    ⛔ Abort
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No executions found for this project.</p>
+    {% endif %}
+
+    <!-- Abort Modal -->
+    <div id="abortModal">
+        <div class="modal-content">
+            <h4>⚠️ Abort Pipeline</h4>
+            <p>Aborting will not clean up resources already created. Please confirm carefully.</p>
+            <label for="abortReasonInput">Reason for aborting:</label>
+            <textarea id="abortReasonInput" rows="4"></textarea>
+            <div class="actions">
+                <button id="cancelAbort">Cancel</button>
+                <button id="confirmAbort">Confirm Abort</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dropdown toggle
+        document.querySelectorAll(".menu-button").forEach(btn => {
+            btn.addEventListener("click", e => {
+                e.stopPropagation();
+                const menu = btn.nextElementSibling;
+                document.querySelectorAll(".dropdown-menu").forEach(m => {
+                    if (m !== menu) m.classList.remove("show");
+                });
+                menu.classList.toggle("show");
+            });
+        });
+
+        document.body.addEventListener("click", () => {
+            document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("show"));
+        });
+
+        // Abort modal logic
+        let currentExecId = null, currentProjId = null, currentPipelineId = null;
+
+        function openAbortModal(execId, projId, pipelineId) {
+            currentExecId = execId;
+            currentProjId = projId;
+            currentPipelineId = pipelineId;
+            document.getElementById("abortReasonInput").value = "";
+            document.getElementById("abortModal").style.display = "block";
+        }
+
+        document.getElementById("cancelAbort").onclick = () => {
+            document.getElementById("abortModal").style.display = "none";
+        };
+
+        document.getElementById("confirmAbort").onclick = () => {
+            const reason = document.getElementById("abortReasonInput").value.trim();
+            if (!reason) {
+                alert("⚠️ Please enter a reason to abort.");
+                return;
+            }
+            fetch("/abort-pipeline", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    execution_id: currentExecId,
+                    project_id: currentProjId,
+                    pipeline_id: currentPipelineId,
+                    abort_reason: reason
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.success ? "✅ " + data.message : "❌ " + data.message);
+                    location.reload();
+                })
+                .catch(err => alert("Error aborting: " + err.message))
+                .finally(() => {
+                    document.getElementById("abortModal").style.display = "none";
+                });
+        };
+    </script>
+</body>
+
+</html>
