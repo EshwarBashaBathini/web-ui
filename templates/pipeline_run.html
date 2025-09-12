@@ -595,20 +595,21 @@
           <!-- Edit Pipeline -->
           <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit" method="get"
             style="display:inline;">
-            <button class="dropdown-item edit-btn" type="submit">✏️ Edit Pipeline</button>
+            <button class="dropdown-item edit-btn" type="submit">✏️ Edit</button>
           </form>
 
           <!-- Rerun Pipeline -->
           <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/run" method="post"
             style="display:inline;">
-            <button class="dropdown-item rerun-btn" type="submit">🔄 Rerun Pipeline</button>
+            <button class="dropdown-item rerun-btn" type="submit">🔄 Rerun</button>
           </form>
 
           <!-- Abort Pipeline (keep modal logic) -->
           <button id="abortBtn" class="dropdown-item abort-btn" {% if (status or "unknown" )|lower in
-            ["aborted", "failed" ] %}disabled{% endif %}>
-            ⛔ Abort Pipeline
+            ["aborted", "failed" , "expired" ] %}disabled{% endif %}>
+            ⛔ Abort
           </button>
+
 
 
 
