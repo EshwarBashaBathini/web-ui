@@ -316,11 +316,57 @@
                 margin-right: 0;
             }
         }
+
+        .header-with-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* center horizontally */
+            gap: 14px;
+            /* space between button and heading */
+            margin-top: 50px;
+            /* push down a bit */
+            width: 100%;
+            /* make container full width */
+        }
+
+        .back-to-pipelines-btn {
+            background: #007bff;
+            /* blue background */
+            color: white;
+            border: none;
+            width: 8%;
+            /* 🔹 button takes 20% width */
+            padding: 10px 0;
+            /* padding top/bottom only */
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* center arrow + text */
+            gap: 6px;
+        }
+
+        .back-to-pipelines-btn:hover {
+            background: #0056b3;
+        }
     </style>
 </head>
 
 <body>
-    <h2>Select Project and Pipeline</h2>
+    <div class="header-with-back">
+        <button class="back-to-pipelines-btn" onclick="window.history.back()">
+            ⬅Back
+        </button>
+        <h2>Select Project and Pipeline</h2>
+    </div>
+
+
+
+
 
     <!-- Project Section -->
     <div class="card">
@@ -334,7 +380,8 @@
             </select>
         </div>
         <div class="btn-group">
-            <button type="button" class="inline-btn" id="create-project-btn" onclick="showCreateProjectForm()">Create Project</button>
+            <button type="button" class="inline-btn" id="create-project-btn" onclick="showCreateProjectForm()">Create
+                Project</button>
         </div>
 
         <div id="create-project-form" class="form-container">
@@ -379,7 +426,8 @@
         </div>
 
         <div class="btn-group">
-            <button type="button" class="inline-btn" id="create-pipeline-btn" onclick="showCreatePipelineForm()">Create Pipeline</button>
+            <button type="button" class="inline-btn" id="create-pipeline-btn" onclick="showCreatePipelineForm()">Create
+                Pipeline</button>
         </div>
 
         <div id="create-pipeline-form" class="form-container">
@@ -449,6 +497,9 @@
     </div>
 
     <script>
+
+
+
         // ===== Dynamic Stages and Steps =====
         let stageCount = 0;
 

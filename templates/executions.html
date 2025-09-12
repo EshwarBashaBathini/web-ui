@@ -407,16 +407,13 @@
                                     onclick="window.location.href='/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/edit'">
                                     ✏️ Edit
                                 </button>
-                                <button class="dropdown-item rerun-btn" {% if exec.status|lower=="running" %}disabled{%
-                                    endif %}
-                                    onclick="window.location.href='/projects/{{ project_id }}/pipelines/{{ exec.pipeline_id }}/run?execution_id={{ exec.id }}'">
-                                    🔄 Rerun
-                                </button>
-                                <button class="dropdown-item abort-btn" {% if exec.status|lower in
+
+
+                                <!-- <button class="dropdown-item abort-btn" {% if exec.status|lower in
                                     ["aborted","failed","expired"] %}disabled{% endif %}
                                     onclick="openAbortModal('{{ exec.id }}','{{ project_id }}','{{ exec.pipeline_id }}')">
                                     ⛔ Abort
-                                </button>
+                                </button> -->
                             </div>
                         </div>
                     </td>

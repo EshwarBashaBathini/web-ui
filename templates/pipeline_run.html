@@ -76,6 +76,83 @@
       gap: 12px;
     }
 
+    .step {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .step {
+      position: relative;
+    }
+
+    .progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      /* animate via JS below */
+      border-radius: 6px;
+      z-index: 0;
+      /* ensures fill is behind content */
+      opacity: 0.3;
+      pointer-events: none;
+      /* prevents blocking clicks */
+    }
+
+    .step>*:not(.progress-fill) {
+      position: relative;
+      z-index: 1;
+      /* ensures content is above the bar */
+    }
+
+    .status-success .progress-fill {
+      background-color: var(--color-success);
+      width: 100%;
+      opacity: 0.7;
+    }
+
+    .status-failed .progress-fill {
+      background-color: var(--color-failed);
+      width: 100%;
+      opacity: 0.7;
+    }
+
+    .status-aborted .progress-fill {
+      background-color: var(--color-aborted);
+      width: 100%;
+      opacity: 0.7;
+    }
+
+    .status-expired .progress-fill {
+      background-color: gray;
+      width: 100%;
+      opacity: 0.7;
+    }
+
+    .status-running .progress-fill {
+      background-color: var(--color-success);
+      opacity: 0.7;
+      width: 0%;
+      /* will be updated dynamically */
+    }
+
+    .progress-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: var(--color-success);
+      /* or var(--color-running) */
+      z-index: 0;
+      border-radius: 6px;
+      width: 0;
+      transition: width 0.2s linear;
+      opacity: 0.3;
+    }
+
+
+
     h1 {
       font-size: 2.25rem;
       font-weight: 700;
@@ -591,8 +668,6 @@
 
         <button id="menuBtn" class="menu-button" aria-label="More options" tabindex="0">&#8942;</button>
         <div id="dropdownMenu" class="dropdown-menu">
-          <!-- Edit Pipeline -->
-          <!-- Edit Pipeline -->
           <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit" method="get"
             style="display:inline;">
             <button class="dropdown-item edit-btn" type="submit">✏️ Edit</button>
@@ -601,21 +676,18 @@
           <!-- Rerun Pipeline -->
           <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/run" method="post"
             style="display:inline;">
-            <button class="dropdown-item rerun-btn" type="submit">🔄 Rerun</button>
+            <button class="dropdown-item rerun-btn" {% if (status or "unknown" )|lower=="running" %}disabled{% endif %}>
+              🔄 Rerun
+            </button>
           </form>
 
           <!-- Abort Pipeline (keep modal logic) -->
           <button id="abortBtn" class="dropdown-item abort-btn" {% if (status or "unknown" )|lower in
-            ["aborted", "failed" , "expired" ] %}disabled{% endif %}>
-            ⛔ Abort
+            ["failed", "expired" , "success" , "aborted" ] %}disabled{% endif %}>
+            ⛔ Abort Pipeline
           </button>
 
-
-
-
         </div>
-
-
       </div>
     </div>
 
@@ -703,10 +775,14 @@
           {% set step_class = "status-running" %}
 
           {% endif %}
-          <div class="step">
+          <div class="step {{ step_class }}">
+            <div class="progress-fill"></div>
             <span>{{ step.name }}</span>
             <div class="step-log-container">
-              <button class="view-logs-btn" onclick="openLogsModal('{{ step.name }}')">View Logs</button>
+              <button class="view-logs-btn"
+                onclick="openLogsModal('{{ step.name }}', '{{ step.childNodeId }}', '{{ execution_id }}', '{{ pipeline_id }}', '{{ project_id }}')">
+                View Logs
+              </button>
               <span class="status-badge {{ step_class }}">{{ step.status }}</span>
             </div>
           </div>
@@ -726,10 +802,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       const menuBtn = document.getElementById('menuBtn');
       const dropdownMenu = document.getElementById('dropdownMenu');
-      const editBtn = document.getElementById("editBtn");
-      const rerunBtn = document.getElementById("rerunBtn");
       const abortBtn = document.getElementById("abortBtn");
-
       const abortModal = document.getElementById("abortModal");
       const cancelBtn = document.getElementById("cancelAbort");
       const confirmBtn = document.getElementById("confirmAbort");
@@ -749,44 +822,7 @@
       });
       document.body.addEventListener("click", hideDropdownWhenClickOutside);
 
-      // ✅ Edit Pipeline
-      editBtn.addEventListener("click", () => {
-        dropdownMenu.classList.remove("show");
-        window.location.href = `/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit`;
-      });
-
-      // ✅ Rerun Pipeline
-      rerunBtn.addEventListener("click", async () => {
-        dropdownMenu.classList.remove("show");
-        rerunBtn.disabled = true;
-        rerunBtn.textContent = "⏳ Rerunning...";
-
-        try {
-          const response = await fetch(`/api/execution/{{ execution_id }}/rerun`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              project_id: "{{ project_id }}",
-              pipeline_id: "{{ pipeline_id }}"
-            })
-          });
-
-          const result = await response.json();
-          if (result.success) {
-            // redirect to the new run page with new execution_id
-            window.location.href = `/projects/${result.project_id}/pipelines/${result.pipeline_id}/run?execution_id=${result.new_execution_id}`;
-          } else {
-            alert("❌ Failed to rerun pipeline: " + result.message);
-          }
-        } catch (err) {
-          alert("❌ Error rerunning pipeline: " + err.message);
-        } finally {
-          rerunBtn.disabled = false;
-          rerunBtn.textContent = "🔄 Rerun Pipeline";
-        }
-      });
-
-      // ✅ Abort Pipeline
+      // Show abort modal
       abortBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (abortBtn.disabled) return;
@@ -795,10 +831,12 @@
         abortModal.style.display = "block";
       });
 
+      // Cancel closes modal
       cancelBtn.addEventListener("click", () => {
         abortModal.style.display = "none";
       });
 
+      // Confirm abort
       confirmBtn.addEventListener("click", async () => {
         const reason = abortReasonInput.value.trim();
         if (!reason) {
@@ -837,14 +875,72 @@
         }
       });
 
+      // Close abort modal when clicking outside
       window.addEventListener("click", (event) => {
         if (event.target === abortModal) {
           abortModal.style.display = "none";
         }
       });
-    });
 
+      // Logs Modal logic
+      const logsModal = document.getElementById("logsModal");
+      const logsTitle = document.getElementById("logsTitle");
+      const logsContent = document.getElementById("logsContent");
+      const closeLogsBtn = document.getElementById("closeLogs");
+
+      // Fetch real logs for a step
+      window.openLogsModal = async function (stepName, stepIdentifier, planExecutionId, pipelineId, projectId) {
+        logsTitle.textContent = "Logs for Step: " + stepName;
+        logsContent.textContent = "⏳ Loading logs...";
+
+        try {
+          const url = `/projects/${projectId}/pipelines/${pipelineId}/executions/${planExecutionId}/steps/${stepIdentifier}/logs`;
+          const resp = await fetch(url);
+          const data = await resp.json();
+
+          if (data.success) {
+            logsContent.textContent = data.logs;
+          } else {
+            logsContent.textContent = "❌ " + data.message;
+          }
+        } catch (err) {
+          logsContent.textContent = "❌ Failed to fetch logs: " + err.message;
+        }
+
+        logsModal.style.display = "block";
+      };
+
+
+      closeLogsBtn.addEventListener("click", () => {
+        logsModal.style.display = "none";
+      });
+
+      window.addEventListener("click", (event) => {
+        if (event.target === logsModal) {
+          logsModal.style.display = "none";
+        }
+
+        function animateRunningStepProgress(stepElement) {
+          const progressFill = stepElement.querySelector('.progress-fill');
+          let width = 0;
+          const interval = setInterval(() => {
+            width += 5; // Progress increment per tick
+            if (width >= 100) {
+              width = 100;
+              clearInterval(interval);
+            }
+            progressFill.style.width = width + '%';
+          }, 200); // Adjust for speed
+        }
+
+        // For running step(s)
+        document.querySelectorAll('.step.status-running').forEach(animateRunningStepProgress);
+
+      });
+    });
   </script>
+
+
 </body>
 
 </html>

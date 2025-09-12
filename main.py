@@ -24,8 +24,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- HARNESS / config (kept from original) ---
-HARNESS_ACCOUNT_ID = "wFgqu04YQWKpjlzWiWvpmA"
-HARNESS_API_KEY = "pat.wFgqu04YQWKpjlzWiWvpmA.6890831b8844c2246218e31e.mlsxgzr3EphvlV23EfZR"
+# HARNESS_ACCOUNT_ID = "wFgqu04YQWKpjlzWiWvpmA"
+# HARNESS_API_KEY = "pat.wFgqu04YQWKpjlzWiWvpmA.6890831b8844c2246218e31e.mlsxgzr3EphvlV23EfZR"
+# ORG_ID = "default"
+
+HARNESS_ACCOUNT_ID = "GPkYFi-SSEy0it1gqjmrdw"
+HARNESS_API_KEY = "pat.GPkYFi-SSEy0it1gqjmrdw.68c3c776bfafb07215f289fa.WL9SN7ty2p1Pw8ChEuQh"
 ORG_ID = "default"
 
 JSON_FILE = "pipeline_status.json"
@@ -519,7 +523,6 @@ def run_pipeline_post(project_id, pipeline_id):
         return render_template("pipeline_run.html", project_id=project_id, pipeline_id=pipeline_id, runtime_input_yaml=runtime_input_yaml, error=str(e), success=None)
     return redirect(url_for('pipeline_run_view', project_id=project_id, pipeline_id=pipeline_id, execution_id=execution_id))
 
-
 @app.route("/projects/<project_id>/pipelines/<pipeline_id>/run", methods=["GET"])
 def pipeline_run_view(project_id, pipeline_id):
     execution_id = request.args.get("execution_id")
@@ -596,12 +599,12 @@ def pipeline_run_view(project_id, pipeline_id):
                     stage = stage_entry.get("stage", {})
                     stage_name = stage.get("name", "Unnamed Stage")
                     stage_identifier = stage.get("identifier")
-                    stage_status = "pending"
+                    stage_status = "Pending"
 
                     # Match stage with execution status
                     for node in node_map.values():
                         if node.get("identifier") == stage_identifier:
-                            stage_status = node.get("status", "pending")
+                            stage_status = node.get("status", "Pending")
                             break
 
                     # Collect step info
@@ -637,7 +640,7 @@ def pipeline_run_view(project_id, pipeline_id):
             node_execution_id=None,
             project_id=project_id,
             pipeline_name=None,
-            status="pending",
+            status="Unknown",
             stages=[],
             total_stages=0,
         )
@@ -654,6 +657,7 @@ def pipeline_run_view(project_id, pipeline_id):
         stages=stages,
         total_stages=total_stages,
     )
+
 
 
 # Abort pipeline
