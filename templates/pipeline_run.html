@@ -546,23 +546,35 @@
         right: -30px;
       }
     }
+
     /* Highlight container if status is AsyncWaiting */
-.container.async-waiting {
-  background: #fff8e1; /* soft yellow */
-  border: 2px dashed #f59e0b; /* amber border */
-  animation: pulse 2s infinite;
-}
+    .container.async-waiting {
+      background: #fff8e1;
+      /* soft yellow */
+      border: 2px dashed #f59e0b;
+      /* amber border */
+      animation: pulse 2s infinite;
+    }
 
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
-  70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-}
-.status-asyncwaiting {
-  background-color: #f59e0b; /* amber/orange */
-  color: white;
-}
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+      }
 
+      70% {
+        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+      }
+    }
+
+    .status-asyncwaiting {
+      background-color: #f59e0b;
+      /* amber/orange */
+      color: white;
+    }
   </style>
 </head>
 
@@ -579,13 +591,30 @@
 
         <button id="menuBtn" class="menu-button" aria-label="More options" tabindex="0">&#8942;</button>
         <div id="dropdownMenu" class="dropdown-menu">
-          <button id="editBtn" class="dropdown-item edit-btn">✏️ Edit</button>
-          <button id="rerunBtn" class="dropdown-item rerun-btn">🔄 Rerun</button>
-          <button id="abortBtn" class="dropdown-item abort-btn" {% if status.strip().lower() in ["aborted", "failed" ]
-            %}disabled{% endif %}>
+          <!-- Edit Pipeline -->
+          <!-- Edit Pipeline -->
+          <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit" method="get"
+            style="display:inline;">
+            <button class="dropdown-item edit-btn" type="submit">✏️ Edit Pipeline</button>
+          </form>
+
+          <!-- Rerun Pipeline -->
+          <form action="/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/run" method="post"
+            style="display:inline;">
+            <button class="dropdown-item rerun-btn" type="submit">🔄 Rerun Pipeline</button>
+          </form>
+
+          <!-- Abort Pipeline (keep modal logic) -->
+          <button id="abortBtn" class="dropdown-item abort-btn" {% if (status or "unknown" )|lower in
+            ["aborted", "failed" ] %}disabled{% endif %}>
             ⛔ Abort Pipeline
           </button>
+
+
+
         </div>
+
+
       </div>
     </div>
 
@@ -671,7 +700,7 @@
           {% set step_class = "status-aborted" %}
           {% elif step.status.strip().lower() == "running" %}
           {% set step_class = "status-running" %}
-          
+
           {% endif %}
           <div class="step">
             <span>{{ step.name }}</span>
@@ -696,7 +725,10 @@
     document.addEventListener("DOMContentLoaded", () => {
       const menuBtn = document.getElementById('menuBtn');
       const dropdownMenu = document.getElementById('dropdownMenu');
+      const editBtn = document.getElementById("editBtn");
+      const rerunBtn = document.getElementById("rerunBtn");
       const abortBtn = document.getElementById("abortBtn");
+
       const abortModal = document.getElementById("abortModal");
       const cancelBtn = document.getElementById("cancelAbort");
       const confirmBtn = document.getElementById("confirmAbort");
@@ -716,7 +748,44 @@
       });
       document.body.addEventListener("click", hideDropdownWhenClickOutside);
 
-      // Show modal
+      // ✅ Edit Pipeline
+      editBtn.addEventListener("click", () => {
+        dropdownMenu.classList.remove("show");
+        window.location.href = `/projects/{{ project_id }}/pipelines/{{ pipeline_id }}/edit`;
+      });
+
+      // ✅ Rerun Pipeline
+      rerunBtn.addEventListener("click", async () => {
+        dropdownMenu.classList.remove("show");
+        rerunBtn.disabled = true;
+        rerunBtn.textContent = "⏳ Rerunning...";
+
+        try {
+          const response = await fetch(`/api/execution/{{ execution_id }}/rerun`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: "{{ project_id }}",
+              pipeline_id: "{{ pipeline_id }}"
+            })
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            // redirect to the new run page with new execution_id
+            window.location.href = `/projects/${result.project_id}/pipelines/${result.pipeline_id}/run?execution_id=${result.new_execution_id}`;
+          } else {
+            alert("❌ Failed to rerun pipeline: " + result.message);
+          }
+        } catch (err) {
+          alert("❌ Error rerunning pipeline: " + err.message);
+        } finally {
+          rerunBtn.disabled = false;
+          rerunBtn.textContent = "🔄 Rerun Pipeline";
+        }
+      });
+
+      // ✅ Abort Pipeline
       abortBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (abortBtn.disabled) return;
@@ -724,11 +793,11 @@
         abortReasonInput.value = "";
         abortModal.style.display = "block";
       });
-      // Cancel closes modal
+
       cancelBtn.addEventListener("click", () => {
         abortModal.style.display = "none";
       });
-      // Confirm abort
+
       confirmBtn.addEventListener("click", async () => {
         const reason = abortReasonInput.value.trim();
         if (!reason) {
@@ -766,35 +835,14 @@
           abortModal.style.display = "none";
         }
       });
-      // Close abort modal when clicking outside
+
       window.addEventListener("click", (event) => {
         if (event.target === abortModal) {
           abortModal.style.display = "none";
         }
       });
-
-      // Logs Modal logic
-      const logsModal = document.getElementById("logsModal");
-      const logsTitle = document.getElementById("logsTitle");
-      const logsContent = document.getElementById("logsContent");
-      const closeLogsBtn = document.getElementById("closeLogs");
-
-      window.openLogsModal = function (stepName) {
-        logsTitle.textContent = "Logs for Step: " + stepName;
-        logsContent.textContent = `🚀 Starting step: ${stepName}\nChecking resources...\nRunning commands...\n✅ Step completed successfully.`;
-        logsModal.style.display = "block";
-      };
-
-      closeLogsBtn.addEventListener("click", () => {
-        logsModal.style.display = "none";
-      });
-
-      window.addEventListener("click", (event) => {
-        if (event.target === logsModal) {
-          logsModal.style.display = "none";
-        }
-      });
     });
+
   </script>
 </body>
 

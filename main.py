@@ -177,7 +177,7 @@ def recalc_pipeline_stats():
 def root_redirect():
     return redirect(url_for('list_projects'))
 
-@app.route("/projects", methods=["GET"])
+@app.route("/projects", methods=["GET"], strict_slashes=False)
 def list_projects():
     url = f"https://app.harness.io/gateway/ng/api/projects?accountIdentifier={HARNESS_ACCOUNT_ID}&orgIdentifier={ORG_ID}"
     headers = get_harness_headers()
@@ -193,7 +193,7 @@ def list_projects():
         return render_template("project_list.html", projects=[], error=str(e))
 
 # Pipeline list (render)
-@app.route("/projects/<project_id>/pipelines", methods=["GET"])
+@app.route("/projects/<project_id>/pipelines", methods=["GET"], strict_slashes=False)
 def list_pipelines(project_id):
     pipelines_url = f"https://app.harness.io/v1/orgs/{ORG_ID}/projects/{project_id}/pipelines"
     headers = get_harness_headers()
@@ -242,6 +242,39 @@ def list_pipelines(project_id):
                                error=str(e))
 
 
+@app.route("/projects/<project_id>/pipelines/create", methods=["GET", "POST"], strict_slashes=False)
+def create_pipeline(project_id):
+    # GET -> show create form with project preselected
+    if request.method == "GET":
+        # If you need to populate other dropdowns (e.g., orgs), fetch them here and pass to template.
+        return render_template("form.html", project_id=project_id)
+
+    # POST -> process creation (skeleton)
+    # Expand this to call your backend/Harness API to create the pipeline
+    name = request.form.get("pipeline_name")
+    selected_project = request.form.get("project_id") or project_id
+
+    # basic validation
+    if not name:
+        flash("Please provide a pipeline name", "error")
+        return render_template("form.html", project_id=project_id, pipeline_name=name)
+
+    # Example: call your pipeline-create API (fill in actual implementation)
+    try:
+        payload = {
+            "name": name,
+            "projectIdentifier": selected_project,
+            # add full pipeline YAML / data here...
+        }
+        # resp = requests.post(... create pipeline ...)
+        # resp.raise_for_status()
+        flash("Pipeline created successfully.", "success")
+        return redirect(url_for("pipeline_list_view", project_id=selected_project))
+    except Exception as e:
+        logger.exception("Failed to create pipeline")
+        flash(f"Failed to create pipeline: {e}", "error")
+        return render_template("form.html", project_id=project_id, pipeline_name=name)
+
                             
 
 #new method testing
@@ -273,7 +306,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-@app.route("/projects/<project_id>/executions")
+@app.route("/projects/<project_id>/executions" , strict_slashes=False)
 def project_executions(project_id):
     url = f"{BASE_URL}/pipelines/execution/summary"
     params = {
@@ -307,7 +340,7 @@ def project_executions(project_id):
 
 
 # Delete project
-@app.route("/projects/delete", methods=["POST"])
+@app.route("/projects/delete", methods=["POST"], strict_slashes=False)
 def delete_project():
     identifier = request.form.get("identifier") or request.form.get("identifier")
     url = f"https://app.harness.io/ng/api/projects/{identifier}?accountIdentifier={HARNESS_ACCOUNT_ID}&orgIdentifier={ORG_ID}"
@@ -319,7 +352,7 @@ def delete_project():
         abort(resp.status_code, description=resp.text)
 
 # Update project
-@app.route("/projects/update", methods=["POST"])
+@app.route("/projects/update", methods=["POST"], strict_slashes=False)
 def update_project_post():
     identifier = request.form.get("identifier")
     name = request.form.get("name")
@@ -465,7 +498,7 @@ def pipeline_edit_post(project_id, pipeline_id):
         return render_template("edit_pipeline.html", project_id=project_id, pipeline_id=pipeline_id, pipeline_yaml=pipeline_yaml, error=str(e))
 
 # Run pipeline (trigger)
-@app.route("/projects/<project_id>/pipelines/<pipeline_id>/run", methods=["POST"])
+@app.route("/projects/<project_id>/pipelines/<pipeline_id>/run", methods=["POST"], )
 def run_pipeline_post(project_id, pipeline_id):
     runtime_input_yaml = request.form.get("runtime_input_yaml") or DEFAULT_RUNTIME_INPUT_YAML
     trigger_url = f"https://app.harness.io/gateway/pipeline/api/v1/orgs/{ORG_ID}/projects/{project_id}/pipelines/{pipeline_id}/execute"
@@ -563,12 +596,12 @@ def pipeline_run_view(project_id, pipeline_id):
                     stage = stage_entry.get("stage", {})
                     stage_name = stage.get("name", "Unnamed Stage")
                     stage_identifier = stage.get("identifier")
-                    stage_status = "Unknown"
+                    stage_status = "pending"
 
                     # Match stage with execution status
                     for node in node_map.values():
                         if node.get("identifier") == stage_identifier:
-                            stage_status = node.get("status", "Unknown")
+                            stage_status = node.get("status", "pending")
                             break
 
                     # Collect step info
@@ -604,7 +637,7 @@ def pipeline_run_view(project_id, pipeline_id):
             node_execution_id=None,
             project_id=project_id,
             pipeline_name=None,
-            status="Unknown",
+            status="pending",
             stages=[],
             total_stages=0,
         )
@@ -615,6 +648,7 @@ def pipeline_run_view(project_id, pipeline_id):
         plan_execution_id=plan_execution_id,
         node_execution_id=node_execution_id,
         project_id=project_id,
+        pipeline_id=pipeline_id,
         pipeline_name=pipeline_name,
         status=execution_status,
         stages=stages,
@@ -623,7 +657,7 @@ def pipeline_run_view(project_id, pipeline_id):
 
 
 # Abort pipeline
-@app.route("/abort-pipeline", methods=["POST"])
+@app.route("/abort-pipeline", methods=["POST"], )
 def abort_pipeline():
     body = request.get_json(force=True, silent=True) or {}
     plan_execution_id = body.get("execution_id")
@@ -728,7 +762,7 @@ def delete_connector(project_id, connector_id):
         detail = resp.text
     abort(resp.status_code, description=detail)
 
-@app.route("/projects/<project_id>/connectors/<connector_id>/edit", methods=["GET"])
+@app.route("/projects/<project_id>/connectors/<connector_id>/edit", methods=["GET"], strict_slashes=False)
 def edit_connector_page(project_id, connector_id):
     headers = {"x-api-key": HARNESS_API_KEY, "Harness-Account": HARNESS_ACCOUNT_ID, "Content-Type": "application/json"}
     get_url = f"https://app.harness.io/v1/orgs/{ORG_ID}/projects/{project_id}/connectors/{connector_id}"
@@ -755,7 +789,7 @@ def edit_connector_page(project_id, connector_id):
             secrets.append({"identifier": secret_obj.get("identifier", ""), "name": secret_obj.get("name", "")})
     return render_template("edit_connector.html", project_id=project_id, connector=connector_data, secrets=secrets)
 
-@app.route("/projects/<project_id>/connectors/<connector_id>/edit", methods=["POST"])
+@app.route("/projects/<project_id>/connectors/<connector_id>/edit", methods=["POST"], strict_slashes=False)
 def edit_connector(project_id, connector_id):
     # Accept JSON or form
     if request.is_json:

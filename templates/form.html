@@ -3,6 +3,8 @@
 
 <head>
     <title>Harness Project & Pipeline</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         /* ===== Harness UI Inspired Base Styles ===== */
         *,
@@ -324,7 +326,7 @@
     <div class="card">
         <div class="field-group">
             <label for="project">Project:</label>
-            <select id="project" name="project" onchange="projectChanged()">
+            <select id="project" name="project" onchange="onProjectChange()">
                 <option value="" selected>--Select Project--</option>
                 {% for project in projects %}
                 <option value="{{ project.identifier }}">{{ project.name }}</option>
@@ -332,7 +334,7 @@
             </select>
         </div>
         <div class="btn-group">
-            <button type="button" class="inline-btn" onclick="showCreateProjectForm()">Create Project</button>
+            <button type="button" class="inline-btn" id="create-project-btn" onclick="showCreateProjectForm()">Create Project</button>
         </div>
 
         <div id="create-project-form" class="form-container">
@@ -368,7 +370,7 @@
     <div id="pipeline-container" class="card">
         <div class="field-group">
             <label for="pipeline">Pipeline:</label>
-            <select id="pipeline" name="pipeline" onchange="pipelineChanged()">
+            <select id="pipeline" name="pipeline" onchange="onPipelineChange()">
                 <option value="" selected>--Select pipeline--</option>
                 {% for pipeline in pipelines %}
                 <option value="{{ pipeline.identifier }}">{{ pipeline.name }}</option>
@@ -377,7 +379,7 @@
         </div>
 
         <div class="btn-group">
-            <button type="button" class="inline-btn" onclick="showCreatePipelineForm()">Create Pipeline</button>
+            <button type="button" class="inline-btn" id="create-pipeline-btn" onclick="showCreatePipelineForm()">Create Pipeline</button>
         </div>
 
         <div id="create-pipeline-form" class="form-container">
@@ -415,9 +417,9 @@
 
             <h3>Stages</h3>
             <div id="stages"></div>
-            <button type="button" class="add-btn" onclick="addStage()">+ Add Stage</button>
+            <button type="button" class="btn-add" onclick="addStage()">+ Add Stage</button>
 
-            <div class="btn-group">
+            <div class="btn-group" style="margin-top:18px">
                 <button type="button" onclick="createPipeline()">Create Pipeline</button>
                 <button type="button" onclick="cancelCreatePipeline()" style="
         background-color:#e74c3c;
@@ -446,9 +448,6 @@
         </button>
     </div>
 
-
-
-
     <script>
         // ===== Dynamic Stages and Steps =====
         let stageCount = 0;
@@ -470,17 +469,16 @@
         }
 
         function deleteStage(id) {
-            document.getElementById(id).remove();
+            const el = document.getElementById(id);
+            if (el) el.remove();
         }
 
         function clearStage(stageId) {
             const stageBlock = document.getElementById(stageId);
+            if (!stageBlock) return;
             stageBlock.querySelectorAll('input, select, textarea').forEach(el => {
                 el.value = '';
             });
-        }
-        function handleConnectorChange(e) {
-            console.log("Connector selected:", e.target.value);
         }
 
         function addStep(stageId) {
@@ -512,82 +510,91 @@
           <label>Command:</label>
           <textarea name="command" placeholder="Enter command script here..." rows="6" required></textarea>
         </div>
-        <button type="button" class="delete-step" onclick="document.getElementById('${stepId}').remove()">Delete Step</button>
+        <button type="button" class="btn-delete" onclick="document.getElementById('${stepId}').remove()">Delete Step</button>
       </div>`;
             container.insertAdjacentHTML('beforeend', html);
         }
 
         function toggleCommandField(stepId, shellValue) {
             const stepBlock = document.getElementById(stepId);
+            if (!stepBlock) return;
             const commandField = stepBlock.querySelector('.command-field');
+            if (!commandField) return;
             commandField.style.display = shellValue ? 'block' : 'none';
         }
 
-        function deleteStep(id) {
-            document.getElementById(id).remove();
+        // handle connector change (debug)
+        function handleConnectorChange(e) {
+            console.log("Connector selected:", e.target.value);
         }
 
-        // ===== Existing project Functions =====
-
-
-        function showCreatePipelineForm() {
-            document.getElementById("create-pipeline-form").classList.add("show");
-            document.getElementById("pipeline").style.display = "none";
-            document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]').style.display = "none";
-
-            resetPipelineForm();  // Reset form before loading connectors
-            loadConnectors();
-        }
-
-
-
+        // ===== Form helpers =====
         function resetPipelineForm() {
             const form = document.getElementById("create-pipeline-form");
-
             if (!form) return;
-
-            // Clear input fields
             form.querySelectorAll('input, select, textarea').forEach(el => {
-                el.value = '';
+                // keep connector scope default placeholder untouched if present
+                if (el.id === 'connector_scope') {
+                    el.selectedIndex = 0;
+                } else if (el.tagName.toLowerCase() === 'select') {
+                    el.selectedIndex = 0;
+                } else {
+                    el.value = '';
+                }
             });
-
-            // Remove all dynamic stages
             const stagesContainer = document.getElementById("stages");
             if (stagesContainer) stagesContainer.innerHTML = '';
-
-            // Re-enable connector select
             const connectorSelect = document.getElementById("connector_select");
-            if (connectorSelect) connectorSelect.disabled = false;
-        }
-
-
-        // ===== Pipeline Functions =====
-        function toggleCreatePipelineBtn() {
-            const pipelineSelect = document.getElementById("pipeline");
-            const btn = document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]');
-            btn.style.display = (pipelineSelect.value === "") ? "inline-block" : "none";
+            if (connectorSelect) {
+                connectorSelect.disabled = false;
+                connectorSelect.innerHTML = "<option value=\"\" disabled selected>--Select Connector--</option>";
+            }
         }
 
         function showCreatePipelineForm() {
-            document.getElementById("create-pipeline-form").classList.add("show");
-            document.getElementById("pipeline").style.display = "none";
-            document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]').style.display = "none";
+            const createForm = document.getElementById("create-pipeline-form");
+            const pipelineSelect = document.getElementById("pipeline");
+            const createBtn = document.getElementById("create-pipeline-btn");
+
+            // Reset form before showing
+            resetPipelineForm();
+
+            // Show form and hide pipeline select & create button
+            createForm.classList.add("show");
+            pipelineSelect.style.display = "none";
+            if (createBtn) createBtn.style.display = "none";
+
+            // hide view button while creating
+            document.getElementById("view-pipeline-btn").style.display = "none";
+
+            // Load connectors (since form is open)
+            // do not block UI — loadConnectors will check connector_scope value
             loadConnectors();
         }
 
-        function hideCreatePipelineForm() {
-            document.getElementById("create-pipeline-form").classList.remove("show");
-            document.getElementById("pipeline").style.display = "inline-block";
-            toggleCreatePipelineBtn();
+        function cancelCreatePipeline() {
+            const form = document.getElementById("create-pipeline-form");
+            const pipelineSelect = document.getElementById("pipeline");
+            const createBtn = document.getElementById("create-pipeline-btn");
+
+            form.classList.remove("show");
+            pipelineSelect.style.display = "inline-block";
+            if (createBtn) createBtn.style.display = "inline-block";
+
+            // Reset form contents
+            resetPipelineForm();
+
+            // update visible buttons according to selection
+            updatePipelineButtons();
         }
 
+        // ===== Connectors fetch =====
         async function loadConnectors() {
             const scope = document.getElementById("connector_scope").value;
             const projectId = document.getElementById("project").value;
             const connectorSelect = document.getElementById("connector_select");
             const loader = document.getElementById("connector-loader");
 
-            // Reset connector dropdown
             connectorSelect.innerHTML = "<option disabled selected>Loading...</option>";
             connectorSelect.disabled = true;
             loader.style.display = "inline-block";
@@ -599,7 +606,6 @@
             }
 
             try {
-                // Determine endpoint based on scope
                 let url = "";
                 if (scope === "account") {
                     url = `/connectors/account`;
@@ -628,7 +634,6 @@
                 } else {
                     connectors.forEach(c => {
                         const opt = document.createElement("option");
-                        // Ensure value never comes out undefined
                         opt.value = c.identifier || c.id || c.name || "";
                         opt.textContent = c.name || c.identifier || "Unnamed Connector";
                         connectorSelect.appendChild(opt);
@@ -636,9 +641,6 @@
                 }
 
                 connectorSelect.disabled = false;
-
-                // Debug: confirm options are populated
-
             } catch (err) {
                 console.error("Error fetching connectors:", err);
                 connectorSelect.innerHTML = "<option disabled>Error loading connectors</option>";
@@ -648,55 +650,38 @@
             }
         }
 
-        // Optional: log whenever user changes connector
-        document.getElementById("connector_select").addEventListener("change", e => {
-            console.log("Connector changed to:", e.target.value, "| label:", e.target.options[e.target.selectedIndex].text);
-        });
-
-
+        // ===== Create pipeline AJAX =====
         async function createPipeline() {
-            // --- Get basic field values ---
             const projectId = (document.getElementById("project")?.value || "").trim();
             const name = (document.getElementById("new_pipeline_name")?.value || "").trim();
-
             const connectorSelect = document.getElementById("connector_select");
             const connectorRefRaw = connectorSelect ? connectorSelect.value.trim() : "";
             const connectorRef = connectorRefRaw && connectorRefRaw !== "undefined" ? connectorRefRaw : "";
-
             const connectorScopeRaw = (document.getElementById("connector_scope")?.value || "account").trim();
             const connectorScope = connectorScopeRaw || "account";
-
             const repoName = (document.getElementById("repo_name")?.value || "").trim();
             const gitBranch = (document.getElementById("git_branch")?.value || "").trim();
 
-
-            // --- Validate required fields ---
             if (!projectId || !name || !connectorRef || !repoName || !gitBranch) {
                 alert("All required fields must be filled. Ensure you select a connector.");
                 return;
             }
 
-            // --- Build stages dynamically ---
             const stages = [];
             document.querySelectorAll(".stage-block").forEach(stageBlock => {
                 const stageName = (stageBlock.querySelector("input[name='stage_name']")?.value || "").trim();
                 if (!stageName) return;
-
                 const steps = [];
                 stageBlock.querySelectorAll(".step-block").forEach(stepBlock => {
                     const stepName = (stepBlock.querySelector("input[name='step_name']")?.value || "").trim();
                     const stepType = (stepBlock.querySelector("select[name='step_type']")?.value || "").trim();
                     const shell = (stepBlock.querySelector("select[name='shell']")?.value || "").trim();
                     const command = (stepBlock.querySelector("textarea[name='command']")?.value || "").trim();
-
                     if (stepName && stepType && shell && command) {
                         steps.push({ step_name: stepName, step_type: stepType, shell, command });
                     }
                 });
-
-                if (steps.length > 0) {
-                    stages.push({ stage_name: stageName, steps });
-                }
+                if (steps.length > 0) stages.push({ stage_name: stageName, steps });
             });
 
             if (stages.length === 0) {
@@ -704,7 +689,6 @@
                 return;
             }
 
-            // --- Send request to backend ---
             try {
                 const res = await fetch("/create_pipeline_ajax", {
                     method: "POST",
@@ -722,19 +706,11 @@
 
                 const data = await res.json();
                 if (res.ok) {
-                    const pipelineSelect = document.getElementById("pipeline");
-                    const opt = document.createElement("option");
-                    opt.value = data.pipelineIdentifier;
-                    opt.textContent = data.name;
-                    opt.selected = true;
-                    pipelineSelect.appendChild(opt);
-
-                    hideCreatePipelineForm();
-
-                    // <--- ADD THIS LINE
-                    pipelineChanged();
-                }
-                else {
+                    // Refresh pipeline list and select the new pipeline
+                    await loadPipelines(projectId, data.pipelineIdentifier);
+                    // hide form and show selection UI
+                    cancelCreatePipeline();
+                } else {
                     alert("Error creating pipeline: " + (data.error || "Unknown error"));
                 }
             } catch (err) {
@@ -742,42 +718,9 @@
             }
         }
 
-
-
-        function projectChanged() {
-            const projectSelect = document.getElementById("project");
-            const pipelineContainer = document.getElementById("pipeline-container");
-
-            // Hide pipeline creation form if open
-            hideCreatePipelineForm();
-
-            // Toggle create project button
-            toggleCreateProjectBtn();
-
-            // Reset pipeline form
-            resetPipelineForm();
-
-            if (projectSelect.value !== "") {
-                // Show pipeline section
-                pipelineContainer.style.display = "block";
-                // Load pipelines for selected project
-                loadPipelines(projectSelect.value);
-            } else {
-                // Hide pipeline section if no project selected
-                pipelineContainer.style.display = "none";
-            }
-
-            // ✅ Ensure buttons (Create/View Pipeline) update immediately
-            pipelineChanged();
-        }
-
-
-
-
-        async function loadPipelines() {
-            const projectId = document.getElementById("project").value;
+        // ===== Load pipelines for selected project =====
+        async function loadPipelines(projectId, selectPipelineId = null) {
             const pipelineSelect = document.getElementById("pipeline");
-
             pipelineSelect.innerHTML = "<option value='' selected>Loading...</option>";
             pipelineSelect.disabled = true;
 
@@ -794,7 +737,7 @@
                 defaultOption.disabled = true;
                 pipelineSelect.appendChild(defaultOption);
 
-                if (pipelines.length === 0) {
+                if (!pipelines || pipelines.length === 0) {
                     const noOption = document.createElement("option");
                     noOption.textContent = "No pipelines found";
                     noOption.disabled = true;
@@ -802,58 +745,104 @@
                 } else {
                     pipelines.forEach(p => {
                         const opt = document.createElement("option");
-                        opt.value = p.id;
-                        opt.textContent = p.name;
+                        // support both id or identifier depending on API
+                        opt.value = p.id || p.identifier || p.pipelineIdentifier || p.name;
+                        opt.textContent = p.name || p.identifier || p.pipelineIdentifier || "Unnamed Pipeline";
                         pipelineSelect.appendChild(opt);
                     });
                 }
 
-                pipelineSelect.disabled = false;
-                toggleCreatePipelineBtn();
-                pipelineChanged();
+                // if a pipeline id is provided to auto-select, try to select it
+                if (selectPipelineId) {
+                    const optionToSelect = Array.from(pipelineSelect.options).find(o => o.value === selectPipelineId);
+                    if (optionToSelect) {
+                        optionToSelect.selected = true;
+                    } else {
+                        // if not found, append and select
+                        const opt = document.createElement("option");
+                        opt.value = selectPipelineId;
+                        opt.textContent = selectPipelineId;
+                        opt.selected = true;
+                        pipelineSelect.appendChild(opt);
+                    }
+                }
 
+                pipelineSelect.disabled = false;
+                updatePipelineButtons();
             } catch (err) {
                 pipelineSelect.innerHTML = "<option disabled>Error loading pipelines</option>";
                 pipelineSelect.disabled = true;
+                console.error("Error loading pipelines:", err);
             }
         }
 
-        function pipelineChanged() {
-            const pipelineSelect = document.getElementById("pipeline");
-            const btn = document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]');
-            btn.style.display = (pipelineSelect.value === "") ? "inline-block" : "none";
-        }
-
-        function toggleCreateProjectBtn() {
+        // ===== UI update helpers =====
+        function updatePipelineButtons() {
             const projectSelect = document.getElementById("project");
-            const btn = document.querySelector('button[onclick="showCreateProjectForm()"]');
-            const formVisible = document.getElementById("create-project-form").classList.contains("show");
-            if (!btn) return;
+            const pipelineSelect = document.getElementById("pipeline");
+            const createPipelineBtn = document.getElementById("create-pipeline-btn");
+            const viewBtn = document.getElementById("view-pipeline-btn");
 
-            // Hide button if a project is selected or the create form is open
-            btn.style.display = (projectSelect.value === "" && !formVisible) ? "inline-block" : "none";
+            if (projectSelect.value && pipelineSelect.value) {
+                if (createPipelineBtn) createPipelineBtn.style.display = "none";
+                if (viewBtn) viewBtn.style.display = "inline-block";
+            } else if (projectSelect.value && !pipelineSelect.value) {
+                if (createPipelineBtn) createPipelineBtn.style.display = "inline-block";
+                if (viewBtn) viewBtn.style.display = "none";
+            } else {
+                if (createPipelineBtn) createPipelineBtn.style.display = "none";
+                if (viewBtn) viewBtn.style.display = "none";
+            }
         }
 
+        // Called when a user picks a project from the dropdown
+        function onProjectChange() {
+            const projectSelect = document.getElementById("project");
+            const pipelineContainer = document.getElementById("pipeline-container");
+
+            // hide create pipeline form if open
+            const createForm = document.getElementById("create-pipeline-form");
+            if (createForm) createForm.classList.remove("show");
+
+            // show pipeline container only when a project is selected
+            if (projectSelect.value) {
+                pipelineContainer.style.display = "block";
+                loadPipelines(projectSelect.value);
+            } else {
+                pipelineContainer.style.display = "none";
+            }
+
+            // hide create project button when project selected
+            toggleCreateProjectBtn();
+            updatePipelineButtons();
+        }
+
+        // Called when pipeline dropdown changes
+        function onPipelineChange() {
+            updatePipelineButtons();
+        }
+
+        // ===== Create project flows =====
         function showCreateProjectForm() {
             const form = document.getElementById("create-project-form");
+            if (!form) return;
             form.classList.add("show");
             document.getElementById("project").style.display = "none";
-
-            // Hide the create button
-            const btn = document.querySelector('button[onclick="showCreateProjectForm()"]');
+            const btn = document.getElementById("create-project-btn");
             if (btn) btn.style.display = "none";
-
-            // Reset inputs
             form.querySelectorAll('input').forEach(input => input.value = '');
         }
 
         function cancelCreateProject() {
             const form = document.getElementById("create-project-form");
+            if (!form) return;
             form.classList.remove("show");
             document.getElementById("project").style.display = "inline-block";
-
+            const btn = document.getElementById("create-project-btn");
+            if (btn) btn.style.display = "inline-block";
             toggleCreateProjectBtn();
         }
+
         async function createProject() {
             const name = document.querySelector('#create-project-form input[name="new_project_name"]').value;
             const identifier = document.querySelector('#create-project-form input[name="new_project_id"]').value;
@@ -875,47 +864,21 @@
                 projectSelect.appendChild(opt);
                 cancelCreateProject();
                 document.getElementById("pipeline-container").style.display = "block";
-                loadPipelines();
+                await loadPipelines(data.identifier);
             } else {
                 alert("Error creating project: " + data.error);
             }
         }
 
-        function pipelineChanged() {
+        function toggleCreateProjectBtn() {
             const projectSelect = document.getElementById("project");
-            const pipelineSelect = document.getElementById("pipeline");
-            const createPipelineBtn = document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]');
-            const viewBtn = document.getElementById("view-pipeline-btn");
-
-            if (projectSelect.value && pipelineSelect.value) {
-                // Both selected → show View, hide Create
-                createPipelineBtn.style.display = "none";
-                viewBtn.style.display = "inline-block";
-            } else if (projectSelect.value && !pipelineSelect.value) {
-                // Only project selected → show Create, hide View
-                createPipelineBtn.style.display = "inline-block";
-                viewBtn.style.display = "none";
-            } else {
-                // No project selected → hide both
-                createPipelineBtn.style.display = "none";
-                viewBtn.style.display = "none";
-            }
+            const btn = document.getElementById("create-project-btn");
+            const formVisible = document.getElementById("create-project-form").classList.contains("show");
+            if (!btn) return;
+            btn.style.display = (projectSelect.value === "" && !formVisible) ? "inline-block" : "none";
         }
 
-        function cancelCreatePipeline() {
-            const form = document.getElementById("create-pipeline-form");
-            form.classList.remove("show");
-            document.getElementById("pipeline").style.display = "inline-block";
-
-            // Show the "Create Pipeline" button again
-            const btn = document.querySelector('#pipeline-container button[onclick="showCreatePipelineForm()"]');
-            if (btn) btn.style.display = "inline-block";
-
-            // Reset form
-            resetPipelineForm();
-        }
-
-
+        // View pipeline button handler
         function viewPipeline() {
             const projectId = document.getElementById("project").value;
             const pipelineId = document.getElementById("pipeline").value;
@@ -926,12 +889,50 @@
             window.location.href = `/projects/${projectId}/pipelines/${pipelineId}`;
         }
 
+        // -------------- NEW: auto-select project when page loaded from /projects/<id>/pipelines/create --------------
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                // path match: /projects/<project_id>/pipelines/create or /projects/<project_id>/pipelines/create?...
+                const pathMatch = window.location.pathname.match(/\/projects\/([^\/]+)\/pipelines\/create\/?$/);
+                const qProject = new URLSearchParams(window.location.search).get("project_id");
+                const projectIdFromUrl = pathMatch ? decodeURIComponent(pathMatch[1]) : (qProject || null);
 
+                if (projectIdFromUrl) {
+                    const projectSelect = document.getElementById("project");
 
+                    // try to find existing option
+                    let opt = Array.from(projectSelect.options).find(o => o.value === projectIdFromUrl || o.text === projectIdFromUrl);
 
+                    // if option not found, add it (useful if server didn't render the projects list)
+                    if (!opt) {
+                        opt = document.createElement("option");
+                        opt.value = projectIdFromUrl;
+                        opt.textContent = projectIdFromUrl;
+                        projectSelect.appendChild(opt);
+                    }
 
+                    // select and trigger change logic to load pipelines and show UI
+                    opt.selected = true;
 
+                    // call onProjectChange to show pipeline container and load pipelines
+                    onProjectChange();
 
+                    // If you want the create form to auto-open, set autoOpen = true
+                    const autoOpen = false; // <- change to true if you want form auto-open
+                    if (autoOpen) {
+                        // small delay so loadPipelines can populate before opening form
+                        setTimeout(() => {
+                            showCreatePipelineForm();
+                            const formEl = document.getElementById("create-pipeline-form");
+                            if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }, 500);
+                    }
+                }
+            } catch (err) {
+                console.error("Auto-select project failed:", err);
+            }
+        });
+        // -----------------------------------------------------------------------------------------------
     </script>
 
 </body>
